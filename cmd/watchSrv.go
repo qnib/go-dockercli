@@ -23,8 +23,9 @@ var watchSrv = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0"}
-    cli, err := client.NewClient("tcp://wrex2.r4.05.laxa.gaikai.net:2376", "v1.24", nil, defaultHeaders)
+    //defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0"}
+    cli, err := client.NewEnvClient()
+    //NewClient("tcp://wrex2.r4.05.laxa.gaikai.net:2376", "v1.24", nil, defaultHeaders)
     if err != nil {
         panic(err)
     }
@@ -58,10 +59,12 @@ var watchSrv = &cobra.Command{
       if err != nil {
           panic(err)
       }
-      tm.Clear() // Clear current screen
-      // By moving cursor to top-left position we ensure that console output
-      // will be overwritten each time, instead of adding new.
-      tm.MoveCursor(1, 1)
+      if (loop != 1) {
+        tm.Clear() // Clear current screen
+        // By moving cursor to top-left position we ensure that console output
+        // will be overwritten each time, instead of adding new.
+        tm.MoveCursor(1, 1)
+      }
       tm.Printf(">>> Services \t\t(%s)\n", time.Now().Format(time.RFC3339))
       srvForm := "%-15s %-10s %-30s\n"
       tm.Printf(srvForm, "Name", "Replicas", "Image")
@@ -88,10 +91,10 @@ var watchSrv = &cobra.Command{
       if (loop == 0) {
         cnt = -1
       }
+      tm.Flush() // Call it every time at the end of rendering
       if cnt == loop {
         break
       }
-      tm.Flush() // Call it every time at the end of rendering
       time.Sleep(time.Duration(loopDelay) * time.Second)
     }
   },
