@@ -12,6 +12,7 @@ import (
 
 var loop int
 var loopDelay int
+var noClear bool
 
 // watchSrv loops over nodes, services and tasks
 var watchSrv = &cobra.Command{
@@ -23,12 +24,14 @@ var watchSrv = &cobra.Command{
     cnt := 0
     for {
       cnt += 1
-      tm.Clear() // Clear current screen
-      tm.MoveCursor(1, 1)
+      if loop != 1 || noClear {
+        tm.Clear() // Clear current screen
+        tm.MoveCursor(1, 1)
+      }
       tm.Printf(">> Loop %ds\t\t(%s)\n", loopDelay, time.Now())
       qd.UpdateNodeList()
       qd.Services, _ = qd.UpdateServiceList()
-      //qd.UpdateTaskList()
+      qd.UpdateTaskList()
       qd.PrintServices()
       qd.PrintLogs()
       qd.PrintEvents()
@@ -51,6 +54,7 @@ func init() {
 	// and all subcommands, e.g.:
 	watchSrv.PersistentFlags().IntVar(&loop, "loop", 1, "Loop command [0: infinite]")
   watchSrv.PersistentFlags().IntVar(&loopDelay, "loopDelay", 2, "Loop delay in seconds")
+  watchSrv.PersistentFlags().BoolVar(&noClear, "no-clear", false, "Do not clear the screen for each loop (implicit when loop==1)")
 
 
 	// Cobra supports local flags which will only run when this command
