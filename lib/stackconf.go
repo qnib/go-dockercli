@@ -3,6 +3,8 @@ package dockerlib
 import (
   "fmt"
   "strings"
+
+  //tm "github.com/buger/goterm"
 )
 
 type ImageConf struct {
@@ -11,6 +13,16 @@ type ImageConf struct {
   Name     string
   Sha      bool
   Tag      string
+}
+
+func delete_empty(s []string) []string {
+    var r []string
+    for _, str := range s {
+        if str != "" {
+            r = append(r, str)
+        }
+    }
+    return r
 }
 
 func NewImageConf(image string) (ImageConf) {
@@ -56,7 +68,7 @@ func NewImageConf(image string) (ImageConf) {
 // Returns assembled image name registry/repo/name
 func (ic ImageConf) PrintImage() (string) {
   s := []string{ic.Registry, ic.Repo, ic.Name}
-  return strings.Join(s, "/")
+  return strings.Join(delete_empty(s), "/")
 }
 
 // Returns Tag/sha256 hash

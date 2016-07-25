@@ -21,6 +21,7 @@ import (
 type QnibDocker struct {
   DockerCli     *client.Client
   Services      []swarm.Service
+  SrvTasks      map[string][]TaskConf
   NodeMap       map[string]string
   RuStart       bool
   CurrentConf   map[string]StackConf
@@ -113,6 +114,7 @@ func (qd QnibDocker) PrintServices() {
     srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
     ic := NewImageConf(srvImage)
     tm.Printf(srvForm, srvName, strconv.Itoa(replicas), ic.PrintImage(), ic.PrintTag())
+    qd.PrintTasks(srvName)
   }
 }
 
@@ -125,28 +127,45 @@ func (qd QnibDocker) UpdateServiceConf(srvName string, sc StackConf) {
   }
 }
 
-
 func (qd QnibDocker) IsRuFinished() (bool) {
   tm.Println("Don't think so...")
   return false
 }
 
-func (qd QnibDocker) UpdateTaskList() (bool) {
-  for n,s := range qd.NextConf {
+func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
+  qt := make(map[string][]TaskConf)
+  for _,s := range qd.Services {
+    //replicas := int(*s.Spec.Mode.Replicated.Replicas)
+    srvName := s.Spec.Annotations.Name
+    //srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
+    //ic := NewImageConf(srvImage)
     tfilter := filters.NewArgs()
     tfilter.Add("desired-state", "Running")
-    tfilter.Add("service", n)
+    tfilter.Add("service", srvName)
     tasks, err := qd.DockerCli.TaskList(context.Background(), types.TaskListOptions{Filter: tfilter})
     if err != nil {
         panic(err)
     }
-    taskForm := "%15s %-35s %-20s %-20s %s\n"
-    tm.Printf(taskForm, n, "Slot", "Node", "TaskStatus", "Image", "DesiredImage")
-    for _, t := range tasks {
-      if (s.Image.IsEqual(qd.CurrentConf[n].Image) && t.Status.State == "running") {
-        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.Status.State, t.Spec.ContainerSpec.Image, s.Image.Name)
-      }
+    _, srv := qt[srvName]
+    if ! srv {
+      qt[srvName] = []TaskConf{}
     }
+    for _, t := range tasks {
+      tic := NewImageConf(t.Spec.ContainerSpec.Image)
+      nTask := NewTaskConf(t.ID, t.Meta.Version, t.Slot, tic)
+      qt[srvName] = append(qt[srvName], nTask)
+    }
+
   }
-  return true
+  tm.Println(qt)
+  return qt
+}
+
+func (qd QnibDocker) PrintTasks(srv string) (error) {
+  taskForm := "%-27s %-5s %-25s %-20s %-35s %-35s\n"
+  tm.Printf(taskForm, "ID", "Slot", "Node", "TaskStatus", "Image", "DesiredImage")
+  for _, t := range qd.SrvTasks[srv] {
+      tm.Printf(taskForm, t.ID, strconv.Itoa(t.Slot), t.Host, t.State, t.Image.PrintImage(), "<dunno>")
+  }
+  return nil
 }

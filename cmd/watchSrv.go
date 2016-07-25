@@ -31,7 +31,8 @@ var watchSrv = &cobra.Command{
       tm.Printf(">> Loop %ds\t\t(%s)\n", loopDelay, time.Now())
       qd.UpdateNodeList()
       qd.Services, _ = qd.UpdateServiceList()
-      qd.UpdateTaskList()
+      qd.SrvTasks = qd.UpdateTaskList()
+
       qd.PrintServices()
       qd.PrintLogs()
       qd.PrintEvents()
