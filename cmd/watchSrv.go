@@ -3,6 +3,7 @@ package cmd
 
 import (
     "time"
+    "container/list"
 
     tm "github.com/buger/goterm"
     "github.com/spf13/cobra"
@@ -11,7 +12,6 @@ import (
 
 var loop int
 var loopDelay int
-
 
 // watchSrv loops over nodes, services and tasks
 var watchSrv = &cobra.Command{
@@ -25,11 +25,14 @@ var watchSrv = &cobra.Command{
       cnt += 1
       tm.Clear() // Clear current screen
       tm.MoveCursor(1, 1)
-      tm.Printf("Loop %ds\t\t(%s)\n", loopDelay, time.Now())
+      tm.Printf(">> Loop %ds\t\t(%s)\n", loopDelay, time.Now())
       qd.UpdateNodeList()
-      qd.UpdateServiceList()
+      qd.Services, _ = qd.UpdateServiceList()
       //qd.UpdateTaskList()
-      //qd.PrintServices()
+      qd.PrintServices()
+      qd.PrintLogs()
+      qd.PrintEvents()
+      qd.Logs = list.New()
       tm.Flush()
       if cnt == loop {
         break
@@ -48,6 +51,7 @@ func init() {
 	// and all subcommands, e.g.:
 	watchSrv.PersistentFlags().IntVar(&loop, "loop", 1, "Loop command [0: infinite]")
   watchSrv.PersistentFlags().IntVar(&loopDelay, "loopDelay", 2, "Loop delay in seconds")
+
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
