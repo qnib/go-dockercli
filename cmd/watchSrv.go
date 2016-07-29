@@ -57,7 +57,7 @@ func init() {
   watchSrv.PersistentFlags().IntVar(&loopDelay, "loopDelay", 2, "Loop delay in seconds")
   watchSrv.PersistentFlags().BoolVar(&noClear, "no-clear", false, "Do not clear the screen for each loop (implicit when loop==1)")
   watchSrv.PersistentFlags().StringVar(&serviceList, "services", "", "Comma separated list of services to watch")
-  watchSrv.PersistentFlags().IntVar(&timeout, "timeout", 60, "Timeout for a service to become healthy")
+  watchSrv.PersistentFlags().IntVar(&timeout, "timeout", 0, "Timeout for a service to become healthy [0: disabled]")
 
 
 	// Cobra supports local flags which will only run when this command

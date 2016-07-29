@@ -200,7 +200,7 @@ func (qd QnibDocker) CheckTaskHealth(task TaskConf) (string, float64, bool) {
     c := containers[0]
     cTime := time.Unix(c.Created,0)
     cElapse = time.Since(cTime).Seconds()
-    if float64(qd.ServiceTimeout) < cElapse {
+    if (qd.ServiceTimeout != 0) && (float64(qd.ServiceTimeout) < cElapse) {
       faulty = true
     }
     cStatus = hReg.FindString(c.Status)
