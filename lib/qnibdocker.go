@@ -5,7 +5,6 @@ import (
   "strconv"
   "container/list"
   "time"
-  "os"
   "regexp"
 
   tm "github.com/buger/goterm"
@@ -20,20 +19,19 @@ import (
 //var imageExp = regexp.MustCompile(`(?P<registry>[a-zA-Z0-9\.\-]+)/(?P<registry>[a-zA-Z0-9\.\-]+)`)
 
 type QnibDocker struct {
-  DockerCli     *client.Client
-  ServiceList   string
-  ServiceTimeout int
-  Services      []swarm.Service
-  SrvTasks      map[string][]TaskConf
-  NodeMap       map[string]string
-  RuStart       bool
-  CurrentConf   map[string]StackConf
-  NextConf      map[string]StackConf
-  Logs          *list.List // flushed at each loop iteration
-  Events        *list.List // not flushed, therefore kept while looping through
+  DockerCli       *client.Client
+  ServiceList     string
+  ServiceTimeout  int
+  PrintFaulty     bool
+  Services        []swarm.Service
+  SrvTasks        map[string][]TaskConf
+  NodeMap         map[string]string
+  SrvConf         map[string]StackConf
+  Logs            *list.List // flushed at each loop iteration
+  Events          *list.List // not flushed, therefore kept while looping through
 }
 
-func NewQnibDocker(serviceList string, timeout int) (QnibDocker) {
+func NewQnibDocker(serviceList string, timeout int, pFaulty bool) (QnibDocker) {
   cli, err := client.NewEnvClient()
   if err != nil {
     panic(err)
@@ -41,11 +39,10 @@ func NewQnibDocker(serviceList string, timeout int) (QnibDocker) {
   qd := QnibDocker{
     DockerCli: cli,
     ServiceTimeout: timeout,
-    RuStart: false,
     ServiceList: serviceList,
+    PrintFaulty: pFaulty,
     NodeMap: make(map[string]string),
-    CurrentConf: make(map[string]StackConf),
-    NextConf: make(map[string]StackConf),
+    SrvConf: make(map[string]StackConf),
     Logs:   list.New(),
     Events:   list.New(),
    }
@@ -124,17 +121,10 @@ func (qd QnibDocker) PrintServices() {
 }
 
 func (qd QnibDocker) UpdateServiceConf(srvName string, sc StackConf) {
-  _, srv := qd.CurrentConf[srvName]
+  _, srv := qd.SrvConf[srvName]
   if ! srv {
-    qd.CurrentConf[srvName] = sc
-  } else {
-    qd.AddLog(fmt.Sprintf("Service '%s' already in CurrentConf", srvName))
+    qd.SrvConf[srvName] = sc
   }
-}
-
-func (qd QnibDocker) IsRuFinished() (bool) {
-  tm.Println("Don't think so...")
-  return false
 }
 
 func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
@@ -142,7 +132,7 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
   for _,s := range qd.Services {
     //replicas := int(*s.Spec.Mode.Replicated.Replicas)
     srvName := s.Spec.Annotations.Name
-    tm.Printf(">>>>> %s %s\n", srvName, qd.ServiceList)
+    //tm.Printf(">>>>> %s %s\n", srvName, qd.ServiceList)
     //srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
     //ic := NewImageConf(srvImage)
     tfilter := filters.NewArgs()
@@ -158,30 +148,73 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
     }
     for _, t := range tasks {
       tic := NewImageConf(t.Spec.ContainerSpec.Image)
-      nTask := NewTaskConf(t, tic)
+      nTask := NewTaskConf(t, tic, qd.ServiceTimeout)
+      if qd.SrvConf[srvName].Image.IsEqual(nTask.Image) {
+        nTask.ImgUpdated = true
+      }
       qt[srvName] = append(qt[srvName], nTask)
     }
 
   }
-  //tm.Println(qt)
   return qt
 }
 
 func (qd QnibDocker) PrintTasks(srv string) (error) {
-  taskForm := "%-27s %-7s %-25s %-10s %-10s %-15s %-35s %-35s\n"
-  tm.Printf(taskForm, "ID", "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "DesiredImage")
+  taskForm := "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-15s %-25s\n"
+  if qd.PrintFaulty {
+    taskForm = "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-15s %-25s %-10v %-10v\n"
+    tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Updated", "Faulty")
+  } else {
+    tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag")
+  }
   for _, t := range qd.SrvTasks[srv] {
-      cStatus, cElapse, faulty := qd.CheckTaskHealth(t)
-      if faulty {
-        cStatus = "FAULTY"
-        qd.AddLog(fmt.Sprintf("Slot %d became faulty", t.Slot))
-        tm.Flush()
-        os.Exit(1)
-      }
-      tm.Printf(taskForm, t.ID, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%.1f", cElapse), cStatus, t.Image.PrintImage(), "<dunno>")
+    if qd.PrintFaulty {
+      tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag(), t.ImgUpdated, t.Faulty)
+    } else {
+      tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag())
+    }
   }
 
   return nil
+}
+
+func (qd QnibDocker) CheckRUFinish() (bool, int){
+  allUpdated := true
+  allHealthy := true
+  someFaulty := false
+  for _,srv := range qd.Services {
+    srvName := srv.Spec.Annotations.Name
+    for _, t := range qd.SrvTasks[srvName] {
+      if t.Faulty {
+        someFaulty = true
+      }
+      if t.CntStatus != "healthy" {
+        allHealthy = false
+      }
+      if ! t.ImgUpdated {
+        allUpdated = false
+      }
+    }
+  }
+  if (qd.TaskCountOK() && allUpdated && allHealthy) && ! someFaulty {
+    return true, 0
+  }
+  if someFaulty {
+    return true, 1
+  }
+  return false, 0
+}
+
+func (qd QnibDocker) TaskCountOK() (bool) {
+  allCntOK := true
+  for _,srv := range qd.Services {
+    replicas := int(*srv.Spec.Mode.Replicated.Replicas)
+    srvName := srv.Spec.Annotations.Name
+    if len(qd.SrvTasks[srvName]) != replicas {
+        allCntOK = false
+    }
+  }
+  return allCntOK
 }
 
 func (qd QnibDocker) CheckTaskHealth(task TaskConf) (string, float64, bool) {
@@ -200,10 +233,11 @@ func (qd QnibDocker) CheckTaskHealth(task TaskConf) (string, float64, bool) {
     c := containers[0]
     cTime := time.Unix(c.Created,0)
     cElapse = time.Since(cTime).Seconds()
-    if (qd.ServiceTimeout != 0) && (float64(qd.ServiceTimeout) < cElapse) {
+    cStatus = hReg.FindString(c.Status)
+    if (cStatus != "healthy") && (qd.ServiceTimeout != 0) && (float64(qd.ServiceTimeout) < cElapse) {
       faulty = true
     }
-    cStatus = hReg.FindString(c.Status)
+
   }
   return cStatus, cElapse, faulty
 }

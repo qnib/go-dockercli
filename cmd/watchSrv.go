@@ -10,9 +10,8 @@ import (
     "github.com/qnib/go-dockercli/lib"
 )
 
-var loop, timeout,loopDelay int
 var noClear bool
-var serviceList string
+
 
 // watchSrv loops over nodes, services and tasks
 var watchSrv = &cobra.Command{
@@ -20,7 +19,7 @@ var watchSrv = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    qd := dockerlib.NewQnibDocker(serviceList, timeout)
+    qd := dockerlib.NewQnibDocker(serviceList, 0, false)
     cnt := 0
     for {
       cnt += 1

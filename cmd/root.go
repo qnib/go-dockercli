@@ -24,7 +24,8 @@ import (
 )
 
 var cfgFile string
-
+var timeout,loop, loopDelay int
+var serviceList string
 
 // This represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{

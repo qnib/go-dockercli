@@ -74,7 +74,7 @@ func (ic ImageConf) PrintImage() (string) {
 // Returns Tag/sha256 hash
 func (ic ImageConf) PrintTag() (string) {
   if ic.Sha {
-    return fmt.Sprintf("@sha256:%s", ic.Tag)
+    return fmt.Sprintf("@sha256:%s", ic.Tag[:13])
   }
   return ic.Tag
 }
