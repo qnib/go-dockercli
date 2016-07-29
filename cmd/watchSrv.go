@@ -10,9 +10,9 @@ import (
     "github.com/qnib/go-dockercli/lib"
 )
 
-var loop int
-var loopDelay int
+var loop, timeout,loopDelay int
 var noClear bool
+var serviceList string
 
 // watchSrv loops over nodes, services and tasks
 var watchSrv = &cobra.Command{
@@ -20,7 +20,7 @@ var watchSrv = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    qd := dockerlib.NewQnibDocker()
+    qd := dockerlib.NewQnibDocker(serviceList, timeout)
     cnt := 0
     for {
       cnt += 1
@@ -56,6 +56,8 @@ func init() {
 	watchSrv.PersistentFlags().IntVar(&loop, "loop", 1, "Loop command [0: infinite]")
   watchSrv.PersistentFlags().IntVar(&loopDelay, "loopDelay", 2, "Loop delay in seconds")
   watchSrv.PersistentFlags().BoolVar(&noClear, "no-clear", false, "Do not clear the screen for each loop (implicit when loop==1)")
+  watchSrv.PersistentFlags().StringVar(&serviceList, "services", "", "Comma separated list of services to watch")
+  watchSrv.PersistentFlags().IntVar(&timeout, "timeout", 60, "Timeout for a service to become healthy")
 
 
 	// Cobra supports local flags which will only run when this command

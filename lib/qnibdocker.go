@@ -5,7 +5,8 @@ import (
   "strconv"
   "container/list"
   "time"
-  //"regexp"
+  "os"
+  "regexp"
 
   tm "github.com/buger/goterm"
   "github.com/docker/engine-api/client"
@@ -20,6 +21,8 @@ import (
 
 type QnibDocker struct {
   DockerCli     *client.Client
+  ServiceList   string
+  ServiceTimeout int
   Services      []swarm.Service
   SrvTasks      map[string][]TaskConf
   NodeMap       map[string]string
@@ -30,14 +33,16 @@ type QnibDocker struct {
   Events        *list.List // not flushed, therefore kept while looping through
 }
 
-func NewQnibDocker() (QnibDocker) {
+func NewQnibDocker(serviceList string, timeout int) (QnibDocker) {
   cli, err := client.NewEnvClient()
   if err != nil {
     panic(err)
   }
   qd := QnibDocker{
     DockerCli: cli,
+    ServiceTimeout: timeout,
     RuStart: false,
+    ServiceList: serviceList,
     NodeMap: make(map[string]string),
     CurrentConf: make(map[string]StackConf),
     NextConf: make(map[string]StackConf),
@@ -137,6 +142,7 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
   for _,s := range qd.Services {
     //replicas := int(*s.Spec.Mode.Replicated.Replicas)
     srvName := s.Spec.Annotations.Name
+    tm.Printf(">>>>> %s %s\n", srvName, qd.ServiceList)
     //srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
     //ic := NewImageConf(srvImage)
     tfilter := filters.NewArgs()
@@ -152,20 +158,52 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
     }
     for _, t := range tasks {
       tic := NewImageConf(t.Spec.ContainerSpec.Image)
-      nTask := NewTaskConf(t.ID, t.Meta.Version, t.Slot, tic)
+      nTask := NewTaskConf(t, tic)
       qt[srvName] = append(qt[srvName], nTask)
     }
 
   }
-  tm.Println(qt)
+  //tm.Println(qt)
   return qt
 }
 
 func (qd QnibDocker) PrintTasks(srv string) (error) {
-  taskForm := "%-27s %-5s %-25s %-20s %-35s %-35s\n"
-  tm.Printf(taskForm, "ID", "Slot", "Node", "TaskStatus", "Image", "DesiredImage")
+  taskForm := "%-27s %-7s %-25s %-10s %-10s %-15s %-35s %-35s\n"
+  tm.Printf(taskForm, "ID", "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "DesiredImage")
   for _, t := range qd.SrvTasks[srv] {
-      tm.Printf(taskForm, t.ID, strconv.Itoa(t.Slot), t.Host, t.State, t.Image.PrintImage(), "<dunno>")
+      cStatus, cElapse, faulty := qd.CheckTaskHealth(t)
+      if faulty {
+        cStatus = "FAULTY"
+        qd.AddLog(fmt.Sprintf("Slot %d became faulty", t.Slot))
+        tm.Flush()
+        os.Exit(1)
+      }
+      tm.Printf(taskForm, t.ID, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%.1f", cElapse), cStatus, t.Image.PrintImage(), "<dunno>")
   }
+
   return nil
+}
+
+func (qd QnibDocker) CheckTaskHealth(task TaskConf) (string, float64, bool) {
+  hReg := regexp.MustCompile("(healthy|healthy|starting)")
+  tempCli, err := client.NewEnvClient()
+  if err != nil {
+    panic(err)
+  }
+  cfilter := filters.NewArgs()
+  cfilter.Add("id", task.ContainerID)
+  containers, _ := tempCli.ContainerList(context.Background(), types.ContainerListOptions{Filter: cfilter})
+  var cElapse float64
+  var cStatus string
+  faulty := false
+  if len(containers) == 1 {
+    c := containers[0]
+    cTime := time.Unix(c.Created,0)
+    cElapse = time.Since(cTime).Seconds()
+    if float64(qd.ServiceTimeout) < cElapse {
+      faulty = true
+    }
+    cStatus = hReg.FindString(c.Status)
+  }
+  return cStatus, cElapse, faulty
 }

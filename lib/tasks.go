@@ -1,6 +1,8 @@
 package dockerlib
 
 import (
+  "time"
+
   "github.com/docker/engine-api/types/swarm"
 )
 
@@ -25,20 +27,32 @@ func (qt QnibTasks) IsItem(tc TaskConf) (bool) {
 
 type TaskConf struct {
   ID    string
+  UpdatedAt time.Time
+  CreatedAt time.Time
   Version swarm.Version
   Slot    int
   Image   ImageConf
-  Host    string
-  State   string
+  NodeID    string
+  ContainerID string
+  State   swarm.TaskState
+  StateTime time.Time
+  DesiredState swarm.TaskState
+  CntState string
 }
 
-func NewTaskConf(id string, ver swarm.Version, slot int, img ImageConf) (TaskConf) {
+func NewTaskConf(task swarm.Task, img ImageConf) (TaskConf) {
   return TaskConf{
-    ID: id,
-    Version: ver,
-    Slot: slot,
+    ID: task.ID,
+    UpdatedAt: task.Meta.UpdatedAt,
+    CreatedAt: task.Meta.CreatedAt,
+    Version: task.Meta.Version,
+    Slot: task.Slot,
     Image: img,
-    Host: "",
-    State: "",
+    NodeID: task.NodeID,
+    ContainerID: task.Status.ContainerStatus.ContainerID,
+    State: task.Status.State,
+    StateTime: task.Status.Timestamp,
+    DesiredState: task.DesiredState,
+    CntState: "",
   }
 }
