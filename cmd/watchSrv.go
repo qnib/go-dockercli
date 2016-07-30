@@ -19,7 +19,7 @@ var watchSrv = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    qd := dockerlib.NewQnibDocker(serviceList, 0, false, false)
+    qd := dockerlib.NewQnibDocker(serviceList, 0, false, noPrint)
     cnt := 0
     for {
       cnt += 1
