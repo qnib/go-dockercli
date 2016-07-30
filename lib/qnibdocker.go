@@ -23,6 +23,7 @@ type QnibDocker struct {
   ServiceList     string
   ServiceTimeout  int
   PrintFaulty     bool
+  NoPrint          bool
   Services        []swarm.Service
   SrvTasks        map[string][]TaskConf
   NodeMap         map[string]string
@@ -31,7 +32,7 @@ type QnibDocker struct {
   Events          *list.List // not flushed, therefore kept while looping through
 }
 
-func NewQnibDocker(serviceList string, timeout int, pFaulty bool) (QnibDocker) {
+func NewQnibDocker(serviceList string, timeout int, pFaulty bool, noPrint bool) (QnibDocker) {
   cli, err := client.NewEnvClient()
   if err != nil {
     panic(err)
@@ -41,6 +42,7 @@ func NewQnibDocker(serviceList string, timeout int, pFaulty bool) (QnibDocker) {
     ServiceTimeout: timeout,
     ServiceList: serviceList,
     PrintFaulty: pFaulty,
+    NoPrint: noPrint,
     NodeMap: make(map[string]string),
     SrvConf: make(map[string]StackConf),
     Logs:   list.New(),
@@ -57,10 +59,14 @@ func (qd QnibDocker) AddEvent(event string) (error) {
 
 func (qd QnibDocker) PrintEvents() (error) {
   if qd.Events.Len() > 0 {
-    tm.Printf("\n\n>> Events\n")
+    if ! qd.NoPrint {
+      tm.Printf("\n\n>> Events\n")
+    }
   }
   for e := qd.Events.Front(); e != nil; e = e.Next() {
-		tm.Println(e.Value)
+    if ! qd.NoPrint {
+      tm.Println(e.Value)
+    }
 	}
   return nil
 }
@@ -73,10 +79,14 @@ func (qd QnibDocker) AddLog(log string) (error) {
 
 func (qd QnibDocker) PrintLogs() (error) {
   if qd.Logs.Len() > 0 {
-    tm.Printf("\n\n>> Logs within Loop (flushed afterwards)\n")
+      if ! qd.NoPrint {
+        tm.Printf("\n\n>> Logs within Loop (flushed afterwards)\n")
+      }
   }
   for e := qd.Logs.Front(); e != nil; e = e.Next() {
-		tm.Println(e.Value)
+    if ! qd.NoPrint {
+      tm.Println(e.Value)
+    }
 	}
   return nil
 }
@@ -109,13 +119,17 @@ func (qd QnibDocker) UpdateServiceList() ([]swarm.Service, error) {
 
 func (qd QnibDocker) PrintServices() {
   srvForm := " %-15s %-10s %-40s %-40s\n"
-  tm.Printf(srvForm, "Name", "Replicas", "Image", "Tag")
+  if ! qd.NoPrint {
+    tm.Printf(srvForm, "Name", "Replicas", "Image", "Tag")
+  }
   for _,s := range qd.Services {
     replicas := int(*s.Spec.Mode.Replicated.Replicas)
     srvName := s.Spec.Annotations.Name
     srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
     ic := NewImageConf(srvImage)
-    tm.Printf(srvForm, srvName, strconv.Itoa(replicas), ic.PrintImage(), ic.PrintTag())
+    if ! qd.NoPrint {
+      tm.Printf(srvForm, srvName, strconv.Itoa(replicas), ic.PrintImage(), ic.PrintTag())
+    }
     qd.PrintTasks(srvName)
   }
 }
@@ -160,18 +174,26 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
 }
 
 func (qd QnibDocker) PrintTasks(srv string) (error) {
-  taskForm := "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-15s %-25s\n"
+  taskForm := "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-30s %-25s\n"
   if qd.PrintFaulty {
-    taskForm = "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-15s %-25s %-10v %-10v\n"
-    tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Updated", "Faulty")
+    taskForm = "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-30s %-25s %-10v %-10v\n"
+    if ! qd.NoPrint {
+      tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Updated", "Faulty")
+    }
   } else {
-    tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag")
+    if ! qd.NoPrint {
+      tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag")
+    }
   }
   for _, t := range qd.SrvTasks[srv] {
     if qd.PrintFaulty {
-      tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag(), t.ImgUpdated, t.Faulty)
+      if ! qd.NoPrint {
+        tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag(), t.ImgUpdated, t.Faulty)
+      }
     } else {
-      tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag())
+      if ! qd.NoPrint {
+        tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag())
+      }
     }
   }
 

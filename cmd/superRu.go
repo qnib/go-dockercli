@@ -5,8 +5,8 @@ import (
     "time"
     "container/list"
     "os"
+    "fmt"
 
-    tm "github.com/buger/goterm"
     "github.com/spf13/cobra"
     "github.com/qnib/go-dockercli/lib"
 )
@@ -17,7 +17,7 @@ var superRu = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    qd := dockerlib.NewQnibDocker(serviceList, timeout, true)
+    qd := dockerlib.NewQnibDocker(serviceList, timeout, true, true)
     cnt := 0
     for {
       cnt += 1
@@ -31,12 +31,11 @@ var superRu = &cobra.Command{
         qd.PrintServices()
         qd.PrintLogs()
         qd.PrintEvents()
-        if rc == 0 {
-          tm.Printf(">>> All Services are updated and healthy -> OK")
-        } else if rc == 1 {
-          tm.Printf(">>> Some services are faulty (timeout reached and not healthy) -> FAIL")
+        if (rc == 0) && (! qd.NoPrint) {
+          fmt.Printf(">>> All Services are updated and healthy -> OK")
+        } else if (rc == 1) && (! qd.NoPrint) {
+          fmt.Printf(">>> Some services are faulty (timeout reached and not healthy) -> FAIL")
         }
-        tm.Flush()
         os.Exit(rc)
       }
       time.Sleep(time.Duration(loopDelay) * time.Second)
@@ -54,6 +53,7 @@ func init() {
 	superRu.PersistentFlags().IntVar(&loopDelay, "loopDelay", 2, "Loop delay in seconds")
   superRu.PersistentFlags().StringVar(&serviceList, "services", "", "Comma separated list of services to watch")
   superRu.PersistentFlags().IntVar(&timeout, "timeout", 0, "Timeout for a service to become healthy [0: disabled]")
+  superRu.PersistentFlags().BoolVar(&noPrint, "no-print", false, "Do not print output to avoid ioctl error in environment w/o tty")
 
 
 	// Cobra supports local flags which will only run when this command

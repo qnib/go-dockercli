@@ -4,8 +4,8 @@ local:
 	./build.sh
 
 alpine:
-	docker run -ti -v $(CURDIR):/go-dockercli/ --workdir /go-dockercli/ qnib/alpn-go-dev ./build.sh
+	docker run --rm -ti -v $(CURDIR):/go-dockercli/ --workdir /go-dockercli/ qnib/alpn-go-dev ./build.sh
 
 linux:
-	docker run -ti -v $(CURDIR):/go-dockercli/ --workdir /go-dockercli/ qnib/golang ./build.sh
+	docker run --rm -ti -v $(CURDIR):/go-dockercli/ --workdir /go-dockercli/ qnib/golang ./build.sh
   
