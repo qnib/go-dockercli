@@ -162,7 +162,7 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
     }
     for _, t := range tasks {
       tic := NewImageConf(t.Spec.ContainerSpec.Image)
-      nTask := NewTaskConf(t, tic, qd.ServiceTimeout)
+      nTask := NewTaskConf(t, tic, qd.ServiceTimeout, qd.NodeMap[t.NodeID])
       if qd.SrvConf[srvName].Image.IsEqual(nTask.Image) {
         nTask.ImgUpdated = true
       }
@@ -174,25 +174,25 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
 }
 
 func (qd QnibDocker) PrintTasks(srv string) (error) {
-  taskForm := "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-30s %-25s\n"
+  taskForm := "   >> %-7s %-30s %-10s %-10s %-12s %-30s %-25s\n"
   if qd.PrintFaulty {
-    taskForm = "   >> %-7s %-27s %-25s %-10s %-10s %-15s %-30s %-25s %-10v %-10v\n"
+    taskForm = "   >> %-7s %-30s %-10s %-10s %-15s %-30s %-25s %-10v %-10v\n"
     if ! qd.NoPrint {
-      tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Updated", "Faulty")
+      tm.Printf(taskForm, "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Updated", "Faulty")
     }
   } else {
     if ! qd.NoPrint {
-      tm.Printf(taskForm, "Slot", "ID", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag")
+      tm.Printf(taskForm, "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag")
     }
   }
   for _, t := range qd.SrvTasks[srv] {
     if qd.PrintFaulty {
       if ! qd.NoPrint {
-        tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag(), t.ImgUpdated, t.Faulty)
+        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag(), t.ImgUpdated, t.Faulty)
       }
     } else {
       if ! qd.NoPrint {
-        tm.Printf(taskForm, strconv.Itoa(t.Slot), t.ID, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImage(), t.Image.PrintTag())
+        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag())
       }
     }
   }
@@ -241,7 +241,11 @@ func (qd QnibDocker) TaskCountOK() (bool) {
 
 func (qd QnibDocker) CheckTaskHealth(task TaskConf) (string, float64, bool) {
   hReg := regexp.MustCompile("(healthy|healthy|starting)")
-  tempCli, err := client.NewEnvClient()
+  defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0"}
+  dHost := fmt.Sprintf("tcp://%s:2376", qd.NodeMap[task.NodeID])
+  tm.Println(dHost)
+  tempCli, err := client.NewClient(dHost, "v1.24", nil, defaultHeaders)
+  //tempCli, err := client.NewEnvClient()
   if err != nil {
     panic(err)
   }
@@ -259,6 +263,11 @@ func (qd QnibDocker) CheckTaskHealth(task TaskConf) (string, float64, bool) {
     if (cStatus != "healthy") && (qd.ServiceTimeout != 0) && (float64(qd.ServiceTimeout) < cElapse) {
       faulty = true
     }
+
+  } else {
+    msg := fmt.Sprintf("No container found for ID '%s' on Host '%s'", task.ContainerID, qd.NodeMap[task.NodeID])
+    tm.Println(msg)
+    qd.AddLog(msg)
 
   }
   return cStatus, cElapse, faulty

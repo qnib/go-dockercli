@@ -3,7 +3,7 @@ package dockerlib
 import (
   "time"
   "regexp"
-
+  "fmt"
 
   "github.com/docker/engine-api/types/swarm"
   "github.com/docker/engine-api/client"
@@ -40,17 +40,19 @@ type TaskConf struct {
   Image         ImageConf
   ImgUpdated    bool
   NodeID        string
+  HostName      string
   ContainerID   string
   State         swarm.TaskState
   StateTime     time.Time
   DesiredState  swarm.TaskState
-  CntStatus      string
+  CntStatus     string
+  CntCreatedAt  int
   CntElapseSec  float64
   Faulty        bool
   HealthTimeout int
 }
 
-func NewTaskConf(task swarm.Task, img ImageConf, healthTimeout int) (TaskConf) {
+func NewTaskConf(task swarm.Task, img ImageConf, healthTimeout int, hostName string) (TaskConf) {
 
   tc := TaskConf{
     ID: task.ID,
@@ -61,22 +63,25 @@ func NewTaskConf(task swarm.Task, img ImageConf, healthTimeout int) (TaskConf) {
     Image: img,
     ImgUpdated: false,
     NodeID: task.NodeID,
+    HostName: hostName,
     ContainerID: task.Status.ContainerStatus.ContainerID,
     State: task.Status.State,
     StateTime: task.Status.Timestamp,
     DesiredState: task.DesiredState,
     CntStatus: "",
+    CntCreatedAt: 0,
     CntElapseSec: 0.0,
     Faulty: false,
     HealthTimeout: healthTimeout,
   }
-  tc.CntStatus, tc.CntElapseSec, tc.Faulty = tc.CheckTaskHealth()
+  tc.CntStatus, tc.CntElapseSec, tc.CntCreatedAt, tc.Faulty = tc.CheckTaskHealth()
   return tc
 }
 
-func (tc TaskConf) CheckTaskHealth() (string, float64, bool) {
+func (tc TaskConf) CheckTaskHealth() (string, float64, int, bool) {
   hReg := regexp.MustCompile("(healthy|healthy|starting|no healthcheck)")
-  tempCli, err := client.NewEnvClient()
+  defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0"}
+  tempCli, err := client.NewClient(fmt.Sprintf("tcp://%s:2376", tc.HostName), "v1.24", nil, defaultHeaders)
   if err != nil {
     panic(err)
   }
@@ -85,6 +90,7 @@ func (tc TaskConf) CheckTaskHealth() (string, float64, bool) {
   containers, _ := tempCli.ContainerList(context.Background(), types.ContainerListOptions{Filter: cfilter})
   var cElapse float64
   var cStatus string
+  var cTime int
   faulty := false
   if len(containers) == 1 {
     c := containers[0]
@@ -96,5 +102,5 @@ func (tc TaskConf) CheckTaskHealth() (string, float64, bool) {
     }
 
   }
-  return cStatus, cElapse, faulty
+  return cStatus, cElapse, cTime, faulty
 }

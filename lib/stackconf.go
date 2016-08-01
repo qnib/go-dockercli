@@ -65,6 +65,12 @@ func NewImageConf(image string) (ImageConf) {
   return ic
 }
 
+// Returns assembled image name repo/name
+func (ic ImageConf) PrintImageName() (string) {
+  s := []string{ic.Repo, ic.Name}
+  return strings.Join(delete_empty(s), "/")
+}
+
 // Returns assembled image name registry/repo/name
 func (ic ImageConf) PrintImage() (string) {
   s := []string{ic.Registry, ic.Repo, ic.Name}
