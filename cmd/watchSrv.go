@@ -19,7 +19,7 @@ var watchSrv = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    qd := dockerlib.NewQnibDocker(serviceList, 0, false, noPrint)
+    qd := dockerlib.NewQnibDocker(serviceList, 0, false, noPrint, labelReg)
     cnt := 0
     for {
       cnt += 1
@@ -57,7 +57,7 @@ func init() {
   watchSrv.PersistentFlags().BoolVar(&noClear, "no-clear", false, "Do not clear the screen for each loop (implicit when loop==1)")
   watchSrv.PersistentFlags().StringVar(&serviceList, "services", "", "Comma separated list of services to watch")
   watchSrv.PersistentFlags().IntVar(&timeout, "timeout", 0, "Timeout for a service to become healthy [0: disabled]")
-
+  watchSrv.PersistentFlags().StringVar(&labelReg, "label-regex", "$^", "Regex to match against label keys")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

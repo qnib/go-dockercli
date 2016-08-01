@@ -17,7 +17,7 @@ var superRu = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    qd := dockerlib.NewQnibDocker(serviceList, timeout, true, true)
+    qd := dockerlib.NewQnibDocker(serviceList, timeout, true, true, labelReg)
     cnt := 0
     for {
       cnt += 1

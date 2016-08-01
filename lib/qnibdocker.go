@@ -21,6 +21,7 @@ import (
 type QnibDocker struct {
   DockerCli       *client.Client
   ServiceList     string
+  LabelReg        string
   ServiceTimeout  int
   PrintFaulty     bool
   NoPrint          bool
@@ -32,7 +33,7 @@ type QnibDocker struct {
   Events          *list.List // not flushed, therefore kept while looping through
 }
 
-func NewQnibDocker(serviceList string, timeout int, pFaulty bool, noPrint bool) (QnibDocker) {
+func NewQnibDocker(serviceList string, timeout int, pFaulty bool, noPrint bool, labelReg string) (QnibDocker) {
   cli, err := client.NewEnvClient()
   if err != nil {
     panic(err)
@@ -41,6 +42,7 @@ func NewQnibDocker(serviceList string, timeout int, pFaulty bool, noPrint bool) 
     DockerCli: cli,
     ServiceTimeout: timeout,
     ServiceList: serviceList,
+    LabelReg: labelReg,
     PrintFaulty: pFaulty,
     NoPrint: noPrint,
     NodeMap: make(map[string]string),
@@ -174,7 +176,7 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
 }
 
 func (qd QnibDocker) PrintTasks(srv string) (error) {
-  taskForm := "   >> %-7s %-30s %-10s %-10s %-12s %-30s %-25s\n"
+  taskForm := "   >> %-7s %-30s %-10s %-10s %-12s %-25s %-25s %v\n"
   if qd.PrintFaulty {
     taskForm = "   >> %-7s %-30s %-10s %-10s %-15s %-30s %-25s %-10v %-10v\n"
     if ! qd.NoPrint {
@@ -182,7 +184,7 @@ func (qd QnibDocker) PrintTasks(srv string) (error) {
     }
   } else {
     if ! qd.NoPrint {
-      tm.Printf(taskForm, "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag")
+      tm.Printf(taskForm, "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Labels")
     }
   }
   for _, t := range qd.SrvTasks[srv] {
@@ -192,7 +194,7 @@ func (qd QnibDocker) PrintTasks(srv string) (error) {
       }
     } else {
       if ! qd.NoPrint {
-        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag())
+        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag(), t.PrintLabels(qd.LabelReg))
       }
     }
   }
