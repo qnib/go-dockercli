@@ -112,8 +112,10 @@ func (qd QnibDocker) UpdateServiceList() ([]swarm.Service, error) {
   }
   for _,s := range services {
     srvName := s.Spec.Annotations.Name
-    //replicas := int(*s.Spec.Mode.Replicated.Replicas)
-    replicas := 1
+    replicas := 0
+    if s.Spec.Mode.Replicated != nil {
+      replicas = int(*s.Spec.Mode.Replicated.Replicas)
+    }
     srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
     sc := NewStackConf(srvImage, replicas)
     qd.UpdateServiceConf(srvName, sc)
@@ -242,9 +244,12 @@ func (qd QnibDocker) CheckRUFinish() (bool, int){
 func (qd QnibDocker) TaskCountOK() (bool) {
   allCntOK := true
   for _,srv := range qd.Services {
-    replicas := int(*srv.Spec.Mode.Replicated.Replicas)
+    replicas := 0
+    if srv.Spec.Mode.Replicated != nil {
+      replicas = int(*srv.Spec.Mode.Replicated.Replicas)
+    }
     srvName := srv.Spec.Annotations.Name
-    if len(qd.SrvTasks[srvName]) != replicas {
+    if replicas != 0 && len(qd.SrvTasks[srvName]) != replicas {
         allCntOK = false
     }
   }
