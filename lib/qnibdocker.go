@@ -6,6 +6,7 @@ import (
   "container/list"
   "time"
   "regexp"
+  //"reflect"
 
   tm "github.com/buger/goterm"
   "github.com/docker/engine-api/client"
@@ -110,8 +111,9 @@ func (qd QnibDocker) UpdateServiceList() ([]swarm.Service, error) {
       return nil, err
   }
   for _,s := range services {
-    replicas := int(*s.Spec.Mode.Replicated.Replicas)
     srvName := s.Spec.Annotations.Name
+    //replicas := int(*s.Spec.Mode.Replicated.Replicas)
+    replicas := 1
     srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
     sc := NewStackConf(srvImage, replicas)
     qd.UpdateServiceConf(srvName, sc)
@@ -125,14 +127,21 @@ func (qd QnibDocker) PrintServices() {
     tm.Printf(srvForm, "Name", "Replicas", "Image", "Tag")
   }
   for _,s := range qd.Services {
-    replicas := int(*s.Spec.Mode.Replicated.Replicas)
+    replicas := 0
+    if s.Spec.Mode.Replicated != nil {
+      replicas = int(*s.Spec.Mode.Replicated.Replicas)
+    }
     srvName := s.Spec.Annotations.Name
     srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
     ic := NewImageConf(srvImage)
-    if ! qd.NoPrint {
-      tm.Printf(srvForm, srvName, strconv.Itoa(replicas), ic.PrintImage(), ic.PrintTag())
+    strReplicas := strconv.Itoa(replicas)
+    if strReplicas == "0" {
+      strReplicas = "Global"
     }
-    qd.PrintTasks(srvName)
+    if ! qd.NoPrint {
+      tm.Printf(srvForm, srvName, strReplicas, ic.PrintImage(), ic.PrintTag())
+    }
+    qd.PrintTasks(s)
   }
 }
 
@@ -175,26 +184,27 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
   return qt
 }
 
-func (qd QnibDocker) PrintTasks(srv string) (error) {
+func (qd QnibDocker) PrintTasks(s swarm.Service) (error) {
+  srv := s.Spec.Annotations.Name
   taskForm := "   >> %-7s %-30s %-10s %-10s %-12s %-25s %-25s %v\n"
-  if qd.PrintFaulty {
-    taskForm = "   >> %-7s %-30s %-10s %-10s %-15s %-30s %-25s %-10v %-10v\n"
-    if ! qd.NoPrint {
-      tm.Printf(taskForm, "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Updated", "Faulty")
-    }
-  } else {
-    if ! qd.NoPrint {
+  if s.Spec.Mode.Replicated == nil {
+    taskForm = "   >> %-30s %-10s %-10s %-12s %-25s %-25s %v\n"
+  }
+  if ! qd.NoPrint {
+    if s.Spec.Mode.Replicated != nil {
       tm.Printf(taskForm, "Slot", "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Labels")
+    } else {
+      tm.Printf(taskForm, "Node", "TaskState", "SecSince", "CntStatus", "Image", "Tag", "Labels")
     }
   }
   for _, t := range qd.SrvTasks[srv] {
-    if qd.PrintFaulty {
+    if s.Spec.Mode.Replicated != nil {
       if ! qd.NoPrint {
-        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag(), t.ImgUpdated, t.Faulty)
+        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag(), t.PrintLabels(qd.LabelReg))
       }
     } else {
       if ! qd.NoPrint {
-        tm.Printf(taskForm, strconv.Itoa(t.Slot), qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag(), t.PrintLabels(qd.LabelReg))
+        tm.Printf(taskForm, qd.NodeMap[t.NodeID], t.State, fmt.Sprintf("%-5.1f", t.CntElapseSec), t.CntStatus, t.Image.PrintImageName(), t.Image.PrintTag(), t.PrintLabels(qd.LabelReg))
       }
     }
   }
