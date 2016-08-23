@@ -17,7 +17,7 @@ var superRu = &cobra.Command{
 	Short: "Loops over services and their tasks",
 	Long: ``,
 	Run: func(cmd *cobra.Command, args []string) {
-    qd := dockerlib.NewQnibDocker(serviceList, timeout, true, true, labelReg)
+    qd := dockerlib.NewQnibDocker(serviceList, timeout, true, noPrint, labelReg)
     cnt := 0
     for {
       cnt += 1
@@ -32,9 +32,9 @@ var superRu = &cobra.Command{
         qd.PrintLogs()
         qd.PrintEvents()
         if (rc == 0) && (! qd.NoPrint) {
-          fmt.Printf(">>> All Services are updated and healthy -> OK")
-        } else if (rc == 1) && (! qd.NoPrint) {
-          fmt.Printf(">>> Some services are faulty (timeout reached and not healthy) -> FAIL")
+          fmt.Printf(">>> All Services are updated and healthy -> OK\n")
+        } else if (rc != 0) && (! qd.NoPrint) {
+          fmt.Printf(">>> Some services are faulty (timeout reached and not healthy) -> FAIL\n")
         }
         os.Exit(rc)
       }

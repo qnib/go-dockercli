@@ -79,6 +79,7 @@ func NewTaskConf(task swarm.Task, img ImageConf, healthTimeout int, hostName str
     HealthTimeout: healthTimeout,
   }
   tc.CntStatus, tc.CntElapseSec, tc.CntCreatedAt, tc.Labels, tc.Faulty = tc.CheckTaskHealth()
+  //tc.PrintIt()
   return tc
 }
 
@@ -91,6 +92,16 @@ func (tc TaskConf) PrintLabels(lReg string) (string) {
     }
   }
   return strings.Join(res, ",")
+}
+
+func (tc TaskConf) SetImgUpdated(new bool) (TaskConf) {
+  tc.ImgUpdated = new
+  return tc
+}
+
+
+func (tc TaskConf) PrintIt() {
+  fmt.Printf("%-20s | TaskImg:%v (u2date:%v) | faulty:'%v' | elapseSec:'%.1f' | HCtimeout:'%i'\n", tc.HostName, tc.Image.PrintAll(), tc.ImgUpdated, tc.Faulty, tc.CntElapseSec, tc.HealthTimeout)
 }
 
 func (tc TaskConf) CheckTaskHealth() (string, float64, int, map[string]string, bool) {
@@ -114,10 +125,9 @@ func (tc TaskConf) CheckTaskHealth() (string, float64, int, map[string]string, b
     cTime := time.Unix(c.Created,0)
     cElapse = time.Since(cTime).Seconds()
     cStatus = hReg.FindString(c.Status)
-    if (cStatus != "healthy") && (tc.HealthTimeout != 0) && (float64(tc.HealthTimeout) < cElapse) {
+    if ((cStatus != "healthy") && (cStatus != "")) && (tc.HealthTimeout != 0) && (float64(tc.HealthTimeout) < cElapse) {
       faulty = true
     }
-
   }
   return cStatus, cElapse, cTime, cLab, faulty
 }

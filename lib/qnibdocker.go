@@ -6,7 +6,7 @@ import (
   "container/list"
   "time"
   "regexp"
-  //"reflect"
+  "strings"
 
   tm "github.com/buger/goterm"
   "github.com/docker/engine-api/client"
@@ -112,6 +112,17 @@ func (qd QnibDocker) UpdateServiceList() ([]swarm.Service, error) {
   }
   for _,s := range services {
     srvName := s.Spec.Annotations.Name
+    if (qd.ServiceList != "") {
+      cont := true
+      for _, s := range strings.Split(qd.ServiceList, ",") {
+        if (s == srvName) {
+          cont = false
+        }
+      }
+      if cont {
+        continue
+      }
+    }
     replicas := 0
     if s.Spec.Mode.Replicated != nil {
       replicas = int(*s.Spec.Mode.Replicated.Replicas)
@@ -157,11 +168,20 @@ func (qd QnibDocker) UpdateServiceConf(srvName string, sc StackConf) {
 func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
   qt := make(map[string][]TaskConf)
   for _,s := range qd.Services {
-    //replicas := int(*s.Spec.Mode.Replicated.Replicas)
     srvName := s.Spec.Annotations.Name
-    //tm.Printf(">>>>> %s %s\n", srvName, qd.ServiceList)
-    //srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
-    //ic := NewImageConf(srvImage)
+    if (qd.ServiceList != "") {
+      cont := true
+      for _, s := range strings.Split(qd.ServiceList, ",") {
+        if (s == srvName) {
+          cont = false
+        }
+      }
+      if cont {
+        continue
+      }
+    }
+    srvImage := s.Spec.TaskTemplate.ContainerSpec.Image
+    ic := NewImageConf(srvImage)
     tfilter := filters.NewArgs()
     tfilter.Add("desired-state", "Running")
     tfilter.Add("service", srvName)
@@ -176,10 +196,12 @@ func (qd QnibDocker) UpdateTaskList() (map[string][]TaskConf) {
     for _, t := range tasks {
       tic := NewImageConf(t.Spec.ContainerSpec.Image)
       nTask := NewTaskConf(t, tic, qd.ServiceTimeout, qd.NodeMap[t.NodeID])
-      if qd.SrvConf[srvName].Image.IsEqual(nTask.Image) {
-        nTask.ImgUpdated = true
+      imgEq := ic.IsEqual(nTask.Image)
+      if imgEq {
+        nTask = nTask.SetImgUpdated(true)
       }
       qt[srvName] = append(qt[srvName], nTask)
+
     }
 
   }
@@ -249,7 +271,18 @@ func (qd QnibDocker) TaskCountOK() (bool) {
       replicas = int(*srv.Spec.Mode.Replicated.Replicas)
     }
     srvName := srv.Spec.Annotations.Name
-    if replicas != 0 && len(qd.SrvTasks[srvName]) != replicas {
+    if (qd.ServiceList != "") {
+      cont := true
+      for _, s := range strings.Split(qd.ServiceList, ",") {
+        if (s == srvName) {
+          cont = false
+        }
+      }
+      if cont {
+        continue
+      }
+    }
+    if srv.Spec.Mode.Replicated != nil && replicas != 0 && len(qd.SrvTasks[srvName]) != replicas {
         allCntOK = false
     }
   }
@@ -262,7 +295,6 @@ func (qd QnibDocker) CheckTaskHealth(task TaskConf) (string, float64, bool) {
   dHost := fmt.Sprintf("tcp://%s:2376", qd.NodeMap[task.NodeID])
   tm.Println(dHost)
   tempCli, err := client.NewClient(dHost, "v1.24", nil, defaultHeaders)
-  //tempCli, err := client.NewEnvClient()
   if err != nil {
     panic(err)
   }

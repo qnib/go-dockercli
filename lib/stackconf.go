@@ -65,6 +65,14 @@ func NewImageConf(image string) (ImageConf) {
   return ic
 }
 
+// Returns assembled image name repo/name:tag
+func (ic ImageConf) PrintAll() (string) {
+  s := []string{ic.Repo, ic.Name, ic.PrintTag()}
+  return strings.Join(delete_empty(s), "/")
+}
+
+
+
 // Returns assembled image name repo/name
 func (ic ImageConf) PrintImageName() (string) {
   s := []string{ic.Repo, ic.Name}
@@ -87,7 +95,10 @@ func (ic ImageConf) PrintTag() (string) {
 
 
 func (ic ImageConf) IsEqual(other ImageConf) (bool) {
-  return (ic.Registry == other.Registry) && (ic.Repo == other.Repo) && (ic.Name == other.Name) && (ic.Sha == other.Sha) && (ic.Tag == other.Tag)
+  res := (ic.Registry == other.Registry) && (ic.Repo == other.Repo) && (ic.Name == other.Name) && (ic.Sha == other.Sha) && (ic.Tag == other.Tag)
+  //fmt.Printf("%v --> Reg>%s:%s | Repo>%s:%s | Name>%s:%s | Sha>%v:%v | Tag>%s:%s\n", res, ic.Registry, other.Registry, ic.Repo, other.Repo, ic.Name, other.Name, ic.Sha, other.Sha, ic.Tag, other.Tag)
+  return res
+
 }
 
 
