@@ -1,5 +1,13 @@
 # go-dockercli
-(yet another) Docker CLI to monitor services and act if needed
+(yet another) Docker CLI to monitor services and act if needed. 
+
+The montivation behind it came from the need to be able to verify if a rolling update within the new docker services is successfull or not.
+Therefore the tool checks what a service (or all) desire to run as an Docker Image and if all tasks are running the latest one.
+Furthermore it checks if all services are healthy or running into a timeout.
+
+If all works fine, the script returns 0 - if not it returns 1, which can be picked up by the CI/CD pipeline.
+
+The second use-case is to watch a service and all it's tasks / container, as this is not yet easily discoverable within the docker toolchain itself.
 
 ## Service
 
